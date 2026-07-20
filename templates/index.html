@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PathFinder AI - Career Navigation Matrix</title>
+    <!-- Tailwind CSS v3 CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            950: '#020617',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Alpine.js Core CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <style>
+        body {
+            background: radial-gradient(circle at top right, #1e1b4b, #0f172a, #020617);
+        }
+        .glass-panel {
+            background: rgba(15, 23, 42, 0.45);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glass-card {
+            background: rgba(30, 41, 59, 0.3);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .shimmer {
+            background: linear-gradient(90deg, rgba(30,41,59,0.3) 25%, rgba(51,65,85,0.5) 50%, rgba(30,41,59,0.3) 75%);
+            background-size: 200% 100%;
+            animation: loading-shimmer 1.5s infinite linear;
+        }
+        @keyframes loading-shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+    </style>
+</head>
+<body class="text-slate-100 font-sans min-h-screen flex flex-col justify-between selection:bg-indigo-500 selection:text-white"
+      x-data="{
+          step: 1,
+          loading: false,
+          showResults: false,
+          academicBaseline: '',
+          workStyle: '',
+          geolocation: '',
+          customPath: '',
+          skillsPool: ['Machine Learning', 'Data Architecture', 'UI/UX Strategy', 'Cloud Infrastructure', 'Financial Analysis', 'Cybersecurity', 'Product Management', 'Technical Writing', 'Systems Engineering', 'Agile Operations'],
+          selectedSkills: [],
+          activeTab: 0,
+          matrixData: { careers: [] },
+          toggleSkill(skill) {
+              if (this.selectedSkills.includes(skill)) {
+                  this.selectedSkills = this.selectedSkills.filter(s => s !== skill);
+              } else {
+                  this.selectedSkills.push(skill);
+              }
+          },
+          async executeInferencePipeline() {
+              if (!this.academicBaseline || !this.workStyle || this.selectedSkills.length === 0 || !this.geolocation) {
+                  alert('Please complete all required data metrics before initiating predictive modeling.');
+                  return;
+              }
+              this.loading = true;
+              this.step = 4;
+              
+              try {
+                  const response = await fetch('/api/navigate', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                          academicBaseline: this.academicBaseline,
+                          workStyle: this.workStyle,
+                          selectedSkills: this.selectedSkills,
+                          geolocation: this.geolocation,
+                          customPath: this.customPath
+                      })
+                  });
+                  
+                  if (!response.ok) {
+                      throw new Error('Serverless execution engine returned an operational anomaly.');
+                  }
+                  
+                  this.matrixData = await response.json();
+                  this.activeTab = 0;
+                  this.showResults = true;
+              } catch (error) {
+                  alert('Pipeline Execution Fault: ' + error.message);
+                  this.step = 3;
+              } finally {
+                  this.loading = false;
+              }
+          }
+      }">
+    
+    <!-- Application Header Layer -->
+    <header class="border-b border-slate-800/60 backdrop-blur-md bg-slate-900/40 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <span class="text-xl font-bold tracking-tight bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                    PathFinder AI
+                </span>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="text-xs font-mono text-slate-400 transition-all" x-text="'Configuration Stage: ' + (step <= 3 ? step : 'Dashboard') + '/3'"></span>
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.1)]">
+                    Predictive Engine Active
+                </span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Workspace Frame -->
+    <main class="flex-grow flex items-center justify-center p-4 sm:p-6 lg:p-8 w-full max-w-7xl mx-auto">
+        
+        <!-- Onboarding Wizard Stage -->
+        <div x-show="step <= 3" class="w-full max-w-2xl glass-panel p-6 sm:p-8 rounded-2xl shadow-2xl relative overflow-hidden transition-all duration-300">
+            <div class="absolute -top-40 -right-40 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div class="absolute -bottom-40 -left-40 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+            <!-- Wizard Visual Progress Indicator -->
+            <div class="mb-8 relative z-10">
+                <div class="flex items-center justify-between text-xs font-mono tracking-wider text-slate-400 uppercase mb-3">
+                    <span x-show="step === 1">Step 1: Context Profile Baseline</span>
+                    <span x-show="step === 2">Step 2: Core Competencies Tagging</span>
+                    <span x-show="step === 3">Step 3: Geographic Matrix & Target Vectors</span>
+                    <span x-text="Math.round((step/3)*100) + '% Processed'"></span>
+                </div>
+                <div class="h-1 w-full bg-slate-800 rounded-full overflow-hidden">
+                    <div class="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-500 transition-all duration-300" 
+                         :style="'width: ' + (step === 1 ? '33.33%' : step === 2 ? '66.66%' : '100%')"></div>
+                </div>
+            </div>
+
+            <!-- Step 1: Academic Positioning & Cultural Dynamic Selection -->
+            <div x-show="step === 1" class="space-y-6 relative z-10">
+                <div>
+                    <h2 class="text-2xl font-bold text-white mb-2">Initialize Profile Baseline</h2>
+                    <p class="text-slate-400 text-sm">Specify your baseline background constraints and cultural workflow preferences to frame operational vector mappings.</p>
+                </div>
+                
+                <div class="space-y-5">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">Academic Standing / Background Baseline</label>
+                        <select x-model="academicBaseline" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all">
+                            <option value="">Choose academic parameter...</option>
+                            <option value="Pre-College / High School Technical Focus">Pre-College / High School Technical Focus</option>
+                            <option value="Undergraduate Student (STEM Domain)">Undergraduate Student (STEM Domain)</option>
+                            <option value="Undergraduate Student (Humanities / Strategy)">Undergraduate Student (Humanities / Strategy)</option>
+                            <option value="Post-Graduate / Industry Professional">Post-Graduate / Industry Professional</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-3">Work-Style DNA Vector</label>
+                        <div class="grid grid-cols-1 gap-3">
+                            <label class="flex items-center p-4 rounded-xl border transition-all cursor-pointer"
+                                   :class="workStyle === 'Remote-Autonomous' ? 'bg-indigo-500/10 border-indigo-500/80 shadow-[0_0_15px_rgba(99,102,241,0.1)]' : 'bg-slate-950/40 border-slate-800/80 hover:border-slate-700'">
+                                <input type="radio" name="workStyle" value="Remote-Autonomous" x-model="workStyle" class="sr-only">
+                                <div class="flex flex-col">
+                                    <span class="text-sm font-semibold text-white">Remote Autonomous Ecosystem</span>
+                                    <span class="text-xs text-slate-400 mt-0.5">Prioritizes isolation-sprint metrics and independent deep focused execution.</span>
+                                </div>
+                            </label>
+
+                            <label class="flex items-center p-4 rounded-xl border transition-all cursor-pointer"
+                                   :class="workStyle === 'High-Collaboration' ? 'bg-indigo-500/10 border-indigo-500/80 shadow-[0_0_15px_rgba(99,102,241,0.1)]' : 'bg-slate-950/40 border-slate-800/80 hover:border-slate-700'">
+                                <input type="radio" name="workStyle" value="High-Collaboration" x-model="workStyle" class="sr-only">
+                                <div class="flex flex-col">
+                                    <span class="text-sm font-semibold text-white">High-Collaboration Innovation Hubs</span>
+                                    <span class="text-xs text-slate-400 mt-0.5">Emphasizes sync meetings, rapid whiteboard ideation, and interactive operations.</span>
+                                </div>
+                            </label>
+
+                            <label class="flex items-center p-4 rounded-xl border transition-all cursor-pointer"
+                                   :class="workStyle === 'Hybrid-Structured' ? 'bg-indigo-500/10 border-indigo-500/80 shadow-[0_0_15px_rgba(99,102,241,0.1)]' : 'bg-slate-950/40 border-slate-800/80 hover:border-slate-700'">
+                                <input type="radio" name="workStyle" value="Hybrid-Structured" x-model="workStyle" class="sr-only">
+                                <div class="flex flex-col">
+                                    <span class="text-sm font-semibold text-white">Hybrid Balanced Architecture</span>
+                                    <span class="text-xs text-slate-400 mt-0.5">Blends structured standalone engineering days with localized group review cycles.</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex justify-end pt-4">
+                    <button @click="step = 2" :disabled="!academicBaseline || !workStyle" 
+                            class="px-5 py-2.5 rounded-xl font-medium text-sm text-slate-950 bg-gradient-to-r from-indigo-400 to-purple-400 hover:from-indigo-300 hover:to-purple-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer">
+                        Proceed to Competencies
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 2: Interactive Skill Badges Mapping -->
+            <div x-show="step === 2" class="space-y-6 relative z-10">
+                <div>
+                    <h2 class="text-2xl font-bold text-white mb-2">Core Competencies Mapping</h2>
+                    <p class="text-slate-400 text-sm">Tag structural strategic attributes within your practical baseline capability matrix. Select at least one core component.</p>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-3">Functional Capability Pools</label>
+                    <div class="flex flex-wrap gap-2.5">
+                        <template x-for="skill in skillsPool" :key="skill">
+                            <button @click="toggleSkill(skill)" 
+                                    class="px-4 py-2 text-xs font-medium rounded-xl border transition-all duration-200 cursor-pointer"
+                                    :class="selectedSkills.includes(skill) 
+                                            ? 'bg-gradient-to-r from-indigo-500/20 to-purple-500/20 text-indigo-300 border-indigo-500/70 shadow-[0_0_15px_rgba(99,102,241,0.15)]' 
+                                            : 'bg-slate-950/60 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200'">
+                                <span x-text="skill"></span>
+                                <span x-show="selectedSkills.includes(skill)" class="ml-2 font-bold text-indigo-400">&times;</span>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
+                <div class="bg-slate-950/40 border border-slate-800/80 p-4 rounded-xl text-xs text-slate-400">
+                    <span class="font-semibold text-slate-300 block mb-1.5">Committed Capability Inventory:</span>
+                    <div class="flex flex-wrap gap-1.5" x-show="selectedSkills.length > 0">
+                        <template x-for="s in selectedSkills" :key="s">
+                            <span class="bg-slate-900 border border-slate-800 px-2 py-0.5 rounded text-[11px] text-slate-300" x-text="s"></span>
+                        </template>
+                    </div>
+                    <span x-show="selectedSkills.length === 0" class="italic">Empty vector block. Select tags above.</span>
+                </div>
+
+                <div class="flex justify-between pt-4">
+                    <button @click="step = 1" class="px-5 py-2.5 rounded-xl font-medium text-sm text-slate-400 border border-slate-800 bg-slate-950/20 hover:bg-slate-950/60 transition-all cursor-pointer">
+                        Back
+                    </button>
+                    <button @click="step = 3" :disabled="selectedSkills.length === 0" 
+                            class="px-5 py-2.5 rounded-xl font-medium text-sm text-slate-950 bg-gradient-to-r from-purple-400 to-cyan-400 hover:from-purple-300 hover:to-cyan-300 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer">
+                        Proceed to Geolocation
+                    </button>
+                </div>
+            </div>
+
+            <!-- Step 3: Geographic Target Vectoring & Trigger Pipeline -->
+            <div x-show="step === 3" class="space-y-6 relative z-10">
+                <div>
+                    <h2 class="text-2xl font-bold text-white mb-2">Market Intelligence Configurations</h2>
+                    <p class="text-slate-400 text-sm">Specify regional focus layers to compute standard financial parameters, cost adjustments, and deployment conditions.</p>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">Target Labor Market Geolocation</label>
+                        <select x-model="geolocation" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all">
+                            <option value="">Select geographical zone...</option>
+                            <option value="Tier 1 Tech Densities (Silicon Valley, NYC, Seattle)">Tier 1 Tech Densities (Silicon Valley, NYC, Seattle)</option>
+                            <option value="Emerging Technology Corridors (Austin, Denver, Atlanta)">Emerging Technology Corridors (Austin, Denver, Atlanta)</option>
+                            <option value="Distributed Hybrid Enterprise Ecosystem Network">Distributed Hybrid Enterprise Ecosystem Network</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">Custom Sub-Sector Trajectory Filter (Optional)</label>
+                        <input type="text" x-model="customPath" placeholder="e.g., Applied LLM Engineer, Decentralized Storage Architect..." 
+                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-200 placeholder:text-slate-700 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all">
+                    </div>
+                </div>
+
+                <div class="flex justify-between pt-4">
+                    <button @click="step = 2" class="px-5 py-2.5 rounded-xl font-medium text-sm text-slate-400 border border-slate-800 bg-slate-950/20 hover:bg-slate-950/60 transition-all cursor-pointer">
+                        Back
+                    </button>
+                    <button @click="executeInferencePipeline()" :disabled="!geolocation" 
+                            class="px-6 py-3 rounded-xl font-bold text-sm text-slate-950 bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 hover:brightness-110 shadow-lg shadow-purple-500/20 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer">
+                        Synthesize Navigation Matrix
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Shimmering Skeleton Loader Framework -->
+        <div x-show="step === 4 && loading" class="w-full max-w-6xl glass-panel p-6 sm:p-8 rounded-2xl shadow-2xl relative space-y-8">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-slate-800/80 pb-6 gap-4">
+                <div class="h-8 w-64 shimmer rounded-lg"></div>
+                <div class="h-4 w-40 shimmer rounded-lg"></div>
+            </div>
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Tabs Skeleton -->
+                <div class="space-y-3 lg:col-span-1">
+                    <div class="h-4 w-32 shimmer rounded mb-2"></div>
+                    <div class="h-24 w-full shimmer rounded-xl"></div>
+                    <div class="h-24 w-full shimmer rounded-xl"></div>
+                    <div class="h-24 w-full shimmer rounded-xl"></div>
+                </div>
+                <!-- Core Dashboard Data Skeleton -->
+                <div class="lg:col-span-2 space-y-6">
+                    <div class="h-36 w-full shimmer rounded-xl"></div>
+                    <div class="h-48 w-full shimmer rounded-xl"></div>
+                    <div class="h-40 w-full shimmer rounded-xl"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Analytical Strategy Dashboard Grid -->
+        <div x-show="step === 4 && showResults" class="w-full max-w-6xl glass-panel p-6 sm:p-8 rounded-2xl shadow-2xl space-y-8 relative overflow-hidden transition-all duration-500">
+            
+            <!-- Matrix Synthesis Metadata Row -->
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-6 relative z-10">
+                <div>
+                    <h1 class="text-2xl font-black text-white tracking-tight sm:text-3xl">Strategic Navigation Matrix</h1>
+                    <p class="text-xs sm:text-sm text-slate-400 mt-1">
+                        Computed profiles mapped for <span class="text-indigo-400 font-semibold" x-text="academicBaseline"></span> aligned to <span class="text-purple-400 font-semibold" x-text="workStyle"></span> parameters within <span class="text-cyan-400 font-semibold" x-text="geolocation"></span>.
+                    </p>
+                </div>
+                <button @click="step = 1; showResults = false; selectedSkills = []; academicBaseline = ''; workStyle = ''; geolocation = ''; customPath = '';" 
+                        class="self-start md:self-auto px-4 py-2 text-xs font-semibold bg-slate-950 border border-slate-800 hover:border-slate-700 rounded-xl transition-all text-slate-400 hover:text-white cursor-pointer">
+                    Reset Strategic Engine
+                </button>
+            </div>
+
+            <!-- Complex Analytical View Architecture -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 relative z-10">
+                
+                <!-- Navigation Sub-Track Selecting Column (Left Hand Architecture) -->
+                <div class="lg:col-span-1 space-y-3">
+                    <label class="block text-xs font-bold uppercase tracking-widest text-slate-500 mb-1">Tailored Macro Trajectories</label>
+                    
+                    <template x-for="(career, index) in matrixData.careers" :key="index">
+                        <button @click="activeTab = index" 
+                                class="w-full text-left p-4 rounded-xl border transition-all glass-card relative cursor-pointer block" 
+                                :class="activeTab === index ? 'border-indigo-500/80 shadow-[0_0_20px_rgba(99,102,241,0.15)] bg-indigo-950/20' : 'border-slate-800/80 hover:border-slate-700'">
+                            <div class="flex justify-between items-start gap-2">
+                                <h3 class="font-bold text-white text-base leading-tight" x-text="career.title"></h3>
+                                <span class="text-[10px] font-mono border px-2 py-0.5 rounded-md shrink-0 uppercase tracking-wider" 
+                                      :class="career.alignment_type === 'Optimal Alignment' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : career.alignment_type === 'High Growth' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400'"
+                                      x-text="career.alignment_type"></span>
+                            </div>
+                            <p class="text-xs text-slate-400 mt-2 line-clamp-2" x-text="career.description"></p>
+                        </button>
+                    </template>
+                </div>
+
+                <!-- Deep Visualization Matrix Frame (Right Hand Architecture) -->
+                <div class="lg:col-span-2 space-y-6" x-show="matrixData.careers.length > 0">
+                    
+                    <!-- Core Path Breakdown Container Block -->
+                    <div class="grid grid-cols-1 sm:grid-cols-12 gap-6 p-5 glass-card rounded-xl" x-data="{ current() { return matrixData.careers[activeTab] || {} } }">
+                        
+                        <!-- Future-Proof Circular Progress Metric Display Gauge -->
+                        <div class="sm:col-span-4 flex flex-col items-center justify-center border-b sm:border-b-0 sm:border-r border-slate-800/80 pb-4 sm:pb-0 sm:pr-4">
+                            <span class="text-[10px] font-bold tracking-widest uppercase text-slate-400 mb-3 block text-center">Future-Proof Index</span>
+                            <div class="relative w-24 h-24 flex items-center justify-center">
+                                <svg class="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
+                                    <path class="text-slate-800" stroke-width="3" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                    <path class="transition-all duration-500" 
+                                          :class="current().automation_risk === 'Low' ? 'text-emerald-400' : current().automation_risk === 'Moderate' ? 'text-amber-400' : 'text-rose-400'"
+                                          stroke-width="3" 
+                                          :stroke-dasharray="(current().future_proof_index || 0) + ', 100'" 
+                                          stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                                </svg>
+                                <div class="absolute text-xl font-black font-mono tracking-tight" x-text="(current().future_proof_index || 0) + '%'"></div>
+                            </div>
+                            <span class="text-[10px] text-slate-500 font-mono mt-2" x-text="'Automation Risk: ' + current().automation_risk"></span>
+                        </div>
+
+                        <!-- Regional Sector Alerts & Professional Track Credentials -->
+                        <div class="sm:col-span-8 space-y-3 flex flex-col justify-between">
+                            <div>
+                                <span class="text-[10px] font-bold tracking-widest uppercase text-slate-400 block">Labor Shift Analysis & Intelligence</span>
+                                <h4 class="text-sm font-bold text-indigo-300 mt-1" x-text="current().market_trend_title"></h4>
+                                <p class="text-xs text-slate-400 leading-relaxed mt-1" x-text="current().market_trend_description"></p>
+                            </div>
+                            <div class="flex flex-wrap gap-1.5 pt-2">
+                                <template x-for="cert in current().certifications" :key="cert">
+                                    <span class="bg-slate-950 px-2 py-0.5 border border-slate-800/80 font-mono text-[10px] rounded text-slate-400" x-text="cert"></span>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Milestone Progression Timeline & Salary Threshold Mapping -->
+                    <div class="p-5 glass-card rounded-xl space-y-4" x-data="{ current() { return matrixData.careers[activeTab] || { timeline: {} } } }">
+                        <span class="text-[10px] font-bold tracking-widest uppercase text-slate-400 block">Macro Trajectory Progression Timeline & Compensation Projections</span>
+                        
+                        <div class="space-y-4" x-show="current().timeline">
+                            <!-- Year 1 -->
+                            <div class="space-y-1.5">
+                                <div class="flex justify-between text-xs font-semibold">
+                                    <span class="text-slate-300" x-text="'Year 1 Baseline Target: ' + (current().timeline.year_1?.title || '')"></span>
+                                    <span class="font-mono text-indigo-400" x-text="current().timeline.year_1?.salary || ''"></span>
+                                </div>
+                                <div class="h-2 bg-slate-950 border border-slate-900 rounded-full overflow-hidden">
+                                    <div class="h-full bg-gradient-to-r from-indigo-500 to-indigo-400 transition-all duration-500" :style="'width: ' + (current().timeline.year_1?.percentage || 0) + '%'"></div>
+                                </div>
+                            </div>
+
+                            <!-- Year 5 -->
+                            <div class="space-y-1.5">
+                                <div class="flex justify-between text-xs font-semibold">
+                                    <span class="text-slate-300" x-text="'Year 5 Autonomy Milestone: ' + (current().timeline.year_5?.title || '')"></span>
+                                    <span class="font-mono text-purple-400" x-text="current().timeline.year_5?.salary || ''"></span>
+                                </div>
+                                <div class="h-2 bg-slate-950 border border-slate-900 rounded-full overflow-hidden">
+                                    <div class="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-purple-400 transition-all duration-500" :style="'width: ' + (current().timeline.year_5?.percentage || 0) + '%'"></div>
+                                </div>
+                            </div>
+
+                            <!-- Year 10 -->
+                            <div class="space-y-1.5">
+                                <div class="flex justify-between text-xs font-semibold">
+                                    <span class="text-slate-300" x-text="'Year 10 Principal Horizon: ' + (current().timeline.year_10?.title || '')"></span>
+                                    <span class="font-mono text-cyan-400" x-text="current().timeline.year_10?.salary || ''"></span>
+                                </div>
+                                <div class="h-2 bg-slate-950 border border-slate-900 rounded-full overflow-hidden">
+                                    <div class="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400 transition-all duration-500" :style="'width: ' + (current().timeline.year_10?.percentage || 0) + '%'"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Operational Day-In-The-Life Workflow Simulator -->
+                    <div class="p-5 glass-card rounded-xl space-y-3" x-data="{ current() { return matrixData.careers[activeTab] || {} } }">
+                        <span class="text-[10px] font-bold tracking-widest uppercase text-slate-400 block">Operational workflow routine simulator</span>
+                        <div class="border border-slate-800/60 rounded-xl bg-slate-950/40 p-4 font-mono text-xs text-slate-400 space-y-3 max-h-56 overflow-y-auto">
+                            <template x-for="item in current().day_in_life" :key="item.time">
+                                <div class="py-1.5 border-b border-slate-900/40 last:border-0 flex items-start gap-4">
+                                    <span class="text-indigo-400 font-bold tracking-wider shrink-0" x-text="item.time"></span>
+                                    <span class="text-slate-300" x-text="item.task"></span>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Interactive Competency Gap Analysis & Bridge Plan -->
+                    <div class="p-5 glass-card rounded-xl space-y-3" x-data="{ current() { return matrixData.careers[activeTab] || {} } }">
+                        <span class="text-[10px] font-bold tracking-widest uppercase text-slate-400 block">Upskilling Bridge Protocols</span>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <template x-for="stepItem in current().skill_gap_steps" :key="stepItem.step">
+                                <div class="p-3 bg-slate-950/50 border border-slate-800/80 rounded-xl flex flex-col justify-between">
+                                    <span class="block text-indigo-400 font-black font-mono text-sm uppercase tracking-wide mb-1" x-text="stepItem.step"></span>
+                                    <p class="text-[11px] text-slate-400 leading-relaxed flex-grow" x-text="stepItem.description"></p>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Operational System Footer -->
+    <footer class="border-t border-slate-900 bg-slate-950/40 py-4 text-center text-[10px] font-mono tracking-widest text-slate-600 backdrop-blur-sm">
+        SYSTEM LAYER: PATHFINDER MATRIX V4 // OPTIMIZED RUNTIME LABELS
+    </footer>
+
+</body>
+</html>
