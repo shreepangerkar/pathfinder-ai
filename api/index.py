@@ -4,26 +4,27 @@ from flask import Flask, render_template, request, jsonify
 from groq import Groq
 from dotenv import load_dotenv
 
-# Initialize Environment Configuration
+# Load Environment Configuration
 load_dotenv()
 
 app = Flask(__name__, template_folder='../templates')
 
-# Initialize the Groq Cloud Service Engine client
+# Initialize Groq Client
 groq_api_key = os.getenv("GROQ_API_KEY")
 groq_client = Groq(api_key=groq_api_key)
 
 @app.route('/')
 def serve_dashboard():
-    """Renders the foundational single-page glassmorphic user workspace."""
-    return render_template('index.html')
+    """Renders the main single-page career planner."""
+    return render_template(
+        'index.html',
+        supabase_url=os.getenv("SUPABASE_URL", ""),
+        supabase_anon_key=os.getenv("SUPABASE_ANON_KEY", "")
+    )
 
 @app.route('/api/navigate', methods=['POST'])
 def generate_strategy_matrix():
-    """
-    Ingests client criteria payload, initializes predictive modeling parameters,
-    and returns a structured JSON evaluation framework from the Groq active engine.
-    """
+    """Generates 3 practical career path options using AI."""
     try:
         data = request.get_json() or {}
         
@@ -35,51 +36,52 @@ def generate_strategy_matrix():
 
         skills_formatted = ", ".join(selected_skills) if selected_skills else "General Capabilities"
 
-        # System Directive specifying exact structural integrity mapping for UI data layer parsing
-        system_instruction = """You are the PathFinder AI Analytical Matrix Engine. You output strictly raw, well-formed JSON objects. 
-Do not include markdown wrappers, thoughts, trailing text, or code block markers. 
-Your response must rigidly match this structural layout schema:
+        # Prompt instructing the AI to use plain, friendly, and human English
+        system_instruction = """You are PathFinder AI, a friendly and practical career guidance mentor. 
+Your goal is to give clear, encouraging, and easy-to-understand career roadmaps. Avoid unnecessary jargon, sci-fi buzzwords, or robotic phrases.
+
+Return ONLY a raw, well-formed JSON object matching this exact structure:
 {
   "careers": [
     {
-      "title": "Exact Professional Title",
-      "alignment_type": "Optimal Alignment",
-      "description": "High-level overview description.",
+      "title": "Exact Role Title",
+      "alignment_type": "Best Fit",
+      "description": "A clear, simple 2-sentence summary of what this role is and why it fits.",
       "future_proof_index": 85,
       "automation_risk": "Low",
-      "market_trend_title": "Labor Trend Title Header",
-      "market_trend_description": "Detailed multi-sentence labor movement analysis.",
-      "certifications": ["Cert 1", "Cert 2"],
+      "market_trend_title": "Job Market Demand",
+      "market_trend_description": "A brief, realistic note on hiring trends and industry demand.",
+      "certifications": ["Certification 1", "Certification 2"],
       "timeline": {
         "year_1": {"title": "Entry Role Title", "salary": "$85,000", "percentage": 40},
-        "year_5": {"title": "Senior Role Title", "salary": "$135,000", "percentage": 72},
-        "year_10": {"title": "Principal/Director Title", "salary": "$210,000", "percentage": 100}
+        "year_5": {"title": "Mid-Level Role Title", "salary": "$135,000", "percentage": 72},
+        "year_10": {"title": "Senior / Lead Title", "salary": "$210,000", "percentage": 100}
       },
       "day_in_life": [
-        {"time": "09:00", "task": "Core system review protocol description."},
-        {"time": "13:00", "task": "Collaborative sprint architecture task."}
+        {"time": "09:00", "task": "Simple description of a typical morning task."},
+        {"time": "13:00", "task": "Simple description of an afternoon task."}
       ],
       "skill_gap_steps": [
-        {"step": "STEP 01", "description": "Acquire baseline platform credential details."},
-        {"step": "STEP 02", "description": "Construct operational portfolios within domain spaces."},
-        {"step": "STEP 03", "description": "Target high-density entry hiring tracks."}
+        {"step": "STEP 01", "description": "Practical first step to learn core basics."},
+        {"step": "STEP 02", "description": "Build a hands-on project or portfolio piece."},
+        {"step": "STEP 03", "description": "Apply for entry roles or internships."}
       ]
     }
   ]
 }
-Generate 3 highly tailored career tracks using the provided telemetry framework. The alignment_type must strictly be either 'Optimal Alignment', 'High Growth', or 'Strategic Pivot'. The automation_risk must strictly be either 'Low', 'Moderate', or 'High'."""
+
+Provide 3 distinct career options. The 'alignment_type' MUST strictly be either 'Best Fit', 'High Growth', or 'Alternative Path'. The 'automation_risk' MUST strictly be 'Low', 'Moderate', or 'High'."""
 
         user_context_prompt = (
-            f"Compute career matrix parameters matching the following client tracking variables:\n"
-            f"- Academic Standing Baseline: {academic_baseline}\n"
-            f"- Work-Style Core DNA: {work_style}\n"
-            f"- Selected Technical Core Competencies: {skills_formatted}\n"
-            f"- Targeted Geo Labor Market: {geolocation}\n"
-            f"- Special Track Filter: {custom_path if custom_path else 'None Specified'}\n\n"
-            f"Analyze automation indexing vectors relative to current operational advancements."
+            f"Please generate 3 tailored career paths for a candidate with the following profile:\n"
+            f"- Education / Stage: {academic_baseline}\n"
+            f"- Preferred Work Style: {work_style}\n"
+            f"- Top Skills: {skills_formatted}\n"
+            f"- Preferred Location: {geolocation}\n"
+            f"- Specific Interest / Target Role: {custom_path if custom_path else 'None'}\n"
         )
 
-        # Execute ultra-high-speed LLM completion via active Llama 3.3 70B model on Groq
+        # Call Groq active model Llama 3.3 70B
         completion = groq_client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
@@ -97,7 +99,7 @@ Generate 3 highly tailored career tracks using the provided telemetry framework.
         return jsonify(structured_json)
 
     except Exception as e:
-        return jsonify({"error": f"Internal execution anomaly detected: {str(e)}"}), 500
+        return jsonify({"error": f"Unable to generate recommendations: {str(e)}"}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
