@@ -95,11 +95,50 @@
           init() {
               supabaseClient.auth.getSession().then(({ data: { session } }) => {
                   this.user = session?.user ?? null;
+                  if (this.user) {
+                      this.loadUserPlan();
+                  }
               });
 
               supabaseClient.auth.onAuthStateChange((_event, session) => {
                   this.user = session?.user ?? null;
+                  if (this.user) {
+                      this.loadUserPlan();
+                  }
               });
+          },
+
+          async loadUserPlan() {
+              if (!this.user) return;
+              try {
+                  const { data, error } = await supabaseClient
+                      .from('user_plans')
+                      .select('*')
+                      .eq('user_id', this.user.id)
+                      .maybeSingle();
+
+                  if (error) {
+                      console.error('Error loading saved plan:', error.message);
+                      return;
+                  }
+
+                  if (data) {
+                      this.academicBaseline = data.academic_baseline || '';
+                      this.workStyle = data.work_style || '';
+                      this.selectedSkills = data.selected_skills || [];
+                      this.geolocation = data.geolocation || '';
+                      this.customPath = data.custom_path || '';
+                      this.matrixData = data.matrix_data || { careers: [] };
+
+                      if (this.matrixData && this.matrixData.careers && this.matrixData.careers.length > 0) {
+                          this.showResults = true;
+                          this.step = 4;
+                          this.currentView = 'dashboard';
+                      }
+                  }
+              } catch (err) {
+                  console.error('Failed to load user plan:', err);
+              }
           },
 
           async handleEmailAuth() {
@@ -137,6 +176,14 @@
           async handleSignOut() {
               await supabaseClient.auth.signOut();
               this.user = null;
+              this.showResults = false;
+              this.step = 1;
+              this.matrixData = { careers: [] };
+              this.academicBaseline = '';
+              this.workStyle = '';
+              this.selectedSkills = [];
+              this.geolocation = '';
+              this.customPath = '';
           },
 
           toggleSkill(skill) {
@@ -175,6 +222,27 @@
                   this.matrixData = await response.json();
                   this.activeTab = 0;
                   this.showResults = true;
+
+                  // Save results directly to Supabase
+                  if (this.user) {
+                      const { data, error } = await supabaseClient
+                          .from('user_plans')
+                          .upsert({
+                              user_id: this.user.id,
+                              academic_baseline: this.academicBaseline,
+                              work_style: this.workStyle,
+                              selected_skills: this.selectedSkills,
+                              geolocation: this.geolocation,
+                              custom_path: this.customPath,
+                              matrix_data: this.matrixData,
+                              updated_at: new Date().toISOString()
+                          }, { onConflict: 'user_id' });
+
+                      if (error) {
+                          console.error('Error saving plan to Supabase:', error.message);
+                      }
+                  }
+
               } catch (error) {
                   alert('Error: ' + error.message);
                   this.step = 3;
@@ -230,22 +298,19 @@
         </div>
     </header>
 
-    <!-- AUTHENTICATION MODAL (Email/Password + Google) -->
+    <!-- AUTHENTICATION MODAL -->
     <div x-show="showAuthModal" 
          x-transition.opacity 
          class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md"
          x-cloak>
         <div @click.away="showAuthModal = false" class="w-full max-w-md glass-panel p-6 sm:p-8 rounded-2xl border border-zinc-800 space-y-6 relative shadow-2xl">
-            <!-- Close Button -->
             <button @click="showAuthModal = false" class="absolute top-4 right-4 text-zinc-400 hover:text-white text-lg font-bold cursor-pointer">&times;</button>
 
-            <!-- Modal Header -->
             <div>
                 <h3 class="text-xl font-black text-white uppercase tracking-wider" x-text="authMode === 'login' ? 'Welcome Back' : 'Create an Account'"></h3>
                 <p class="text-xs text-zinc-400 mt-1">Sign in to save and access your personalized career roadmaps.</p>
             </div>
 
-            <!-- Feedback Messages -->
             <template x-if="authError">
                 <div class="p-3 bg-red-950/60 border border-red-800 rounded-xl text-red-200 text-xs font-mono" x-text="authError"></div>
             </template>
@@ -253,7 +318,6 @@
                 <div class="p-3 bg-emerald-950/60 border border-emerald-800 rounded-xl text-emerald-200 text-xs font-mono" x-text="authMessage"></div>
             </template>
 
-            <!-- Google OAuth Button -->
             <button onclick="signInWithGoogle()" class="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-xl text-xs font-semibold text-black bg-white hover:bg-zinc-200 transition-all cursor-pointer shadow-md">
                 <svg class="w-4 h-4" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -270,7 +334,6 @@
                 <div class="flex-grow border-t border-zinc-800"></div>
             </div>
 
-            <!-- Email / Password Form -->
             <form @submit.prevent="handleEmailAuth()" class="space-y-4">
                 <div>
                     <label class="block text-xs font-mono uppercase text-zinc-300 mb-1.5">Email Address</label>
@@ -302,10 +365,8 @@
     <!-- MAIN VIEW CONTAINER -->
     <main class="flex-grow flex flex-col justify-center w-full">
 
-        <!-- ================= LANDING PAGE VIEW ================= -->
+        <!-- LANDING PAGE VIEW -->
         <section x-show="currentView === 'landing'" class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 flex flex-col items-center">
-            
-            <!-- Hero Header -->
             <div class="text-center max-w-3xl space-y-6">
                 <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-zinc-800 bg-zinc-950 text-xs font-mono text-zinc-400">
                     <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -330,36 +391,23 @@
                 </div>
             </div>
 
-            <!-- Feature Cards Grid -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6 w-full mt-20">
                 <div class="glass-card p-6 rounded-2xl border border-zinc-800 space-y-3">
-                    <div class="w-10 h-10 rounded-xl bg-white text-black flex items-center justify-center font-bold text-lg">
-                        01
-                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-white text-black flex items-center justify-center font-bold text-lg">01</div>
                     <h3 class="text-lg font-bold text-white">Smart Role Matching</h3>
-                    <p class="text-xs text-zinc-400 leading-relaxed">
-                        Matches your current skills and background to realistic, high-growth career tracks.
-                    </p>
+                    <p class="text-xs text-zinc-400 leading-relaxed">Matches your current skills and background to realistic, high-growth career tracks.</p>
                 </div>
 
                 <div class="glass-card p-6 rounded-2xl border border-zinc-800 space-y-3">
-                    <div class="w-10 h-10 rounded-xl bg-white text-black flex items-center justify-center font-bold text-lg">
-                        02
-                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-white text-black flex items-center justify-center font-bold text-lg">02</div>
                     <h3 class="text-lg font-bold text-white">Compare 3 Options</h3>
-                    <p class="text-xs text-zinc-400 leading-relaxed">
-                        Explore three distinct path choices (Best Fit, High Growth, and Alternative) side-by-side.
-                    </p>
+                    <p class="text-xs text-zinc-400 leading-relaxed">Explore three distinct path choices (Best Fit, High Growth, and Alternative) side-by-side.</p>
                 </div>
 
                 <div class="glass-card p-6 rounded-2xl border border-zinc-800 space-y-3">
-                    <div class="w-10 h-10 rounded-xl bg-white text-black flex items-center justify-center font-bold text-lg">
-                        03
-                    </div>
+                    <div class="w-10 h-10 rounded-xl bg-white text-black flex items-center justify-center font-bold text-lg">03</div>
                     <h3 class="text-lg font-bold text-white">Clear Action Steps</h3>
-                    <p class="text-xs text-zinc-400 leading-relaxed">
-                        Get recommended certifications, daily routine previews, and step-by-step upskilling guides.
-                    </p>
+                    <p class="text-xs text-zinc-400 leading-relaxed">Get recommended certifications, daily routine previews, and step-by-step upskilling guides.</p>
                 </div>
             </div>
 
@@ -374,14 +422,11 @@
             </div>
         </section>
 
-
-        <!-- ================= DASHBOARD / WIZARD ENGINE VIEW ================= -->
+        <!-- DASHBOARD VIEW -->
         <section x-show="currentView === 'dashboard'" class="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col items-center justify-center">
 
-            <!-- Wizard Steps (1 through 3) -->
+            <!-- WIZARD STEPS -->
             <div x-show="step <= 3" class="w-full max-w-2xl glass-panel p-6 sm:p-8 rounded-2xl shadow-2xl relative overflow-hidden transition-all duration-300">
-
-                <!-- Progress Bar -->
                 <div class="mb-8 relative z-10">
                     <div class="flex items-center justify-between text-xs font-mono tracking-wider text-zinc-400 uppercase mb-3">
                         <span x-show="step === 1">Step 1: Background & Preferences</span>
@@ -395,7 +440,7 @@
                     </div>
                 </div>
 
-                <!-- Step 1: Background & Work Style -->
+                <!-- Step 1 -->
                 <div x-show="step === 1" class="space-y-6 relative z-10">
                     <div>
                         <h2 class="text-2xl font-black text-white uppercase tracking-wide">Tell Us About Yourself</h2>
@@ -455,7 +500,7 @@
                     </div>
                 </div>
 
-                <!-- Step 2: Select Skills -->
+                <!-- Step 2 -->
                 <div x-show="step === 2" class="space-y-6 relative z-10">
                     <div>
                         <h2 class="text-2xl font-black text-white uppercase tracking-wide">Select Your Skills</h2>
@@ -499,7 +544,7 @@
                     </div>
                 </div>
 
-                <!-- Step 3: Location & Target Goals -->
+                <!-- Step 3 -->
                 <div x-show="step === 3" class="space-y-6 relative z-10">
                     <div>
                         <h2 class="text-2xl font-black text-white uppercase tracking-wide">Location & Specific Goals</h2>
@@ -545,8 +590,6 @@
 
             <!-- RESULTS DASHBOARD -->
             <div x-show="step === 4 && showResults" class="w-full max-w-6xl glass-panel p-6 sm:p-8 rounded-2xl shadow-2xl space-y-8 relative overflow-hidden transition-all duration-500">
-                
-                <!-- Dashboard Top Bar -->
                 <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-6">
                     <div>
                         <h1 class="text-2xl font-black text-white uppercase tracking-tight sm:text-3xl">Your Recommended Career Paths</h1>
@@ -560,7 +603,6 @@
                     </button>
                 </div>
 
-                <!-- OPTION TABS -->
                 <div class="space-y-6">
                     <div class="border-b border-zinc-800 pb-4">
                         <span class="text-[10px] font-mono uppercase text-zinc-500 block mb-3">Choose a Path to Explore</span>
@@ -580,10 +622,7 @@
                         </div>
                     </div>
 
-                    <!-- SELECTED OPTION CONTENT -->
                     <div x-show="matrixData.careers.length > 0" class="space-y-6">
-                        
-                        <!-- Header & Role Overview -->
                         <div class="glass-card p-6 rounded-2xl border border-zinc-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
                              x-data="{ current() { return matrixData.careers[activeTab] || {} } }">
                             <div>
@@ -595,11 +634,9 @@
                                   x-text="current().alignment_type"></span>
                         </div>
 
-                        <!-- Core Metrics Row -->
                         <div class="grid grid-cols-1 sm:grid-cols-12 gap-6 p-6 glass-card rounded-2xl border border-zinc-800"
                              x-data="{ current() { return matrixData.careers[activeTab] || {} } }">
                             
-                            <!-- Future Proof Score Gauge -->
                             <div class="sm:col-span-4 flex flex-col items-center justify-center border-b sm:border-b-0 sm:border-r border-zinc-800 pb-4 sm:pb-0 sm:pr-4">
                                 <span class="text-[10px] font-mono tracking-widest uppercase text-zinc-500 mb-3 block text-center">Future-Proof Rating</span>
                                 <div class="relative w-24 h-24 flex items-center justify-center">
@@ -615,7 +652,6 @@
                                 <span class="text-[10px] text-zinc-500 font-mono mt-2 uppercase" x-text="'Automation Risk: ' + current().automation_risk"></span>
                             </div>
 
-                            <!-- Market Trends & Certifications -->
                             <div class="sm:col-span-8 space-y-3 flex flex-col justify-between">
                                 <div>
                                     <span class="text-[10px] font-mono uppercase tracking-widest text-zinc-500 block">Job Market Demand</span>
@@ -633,12 +669,10 @@
                             </div>
                         </div>
 
-                        <!-- Growth Timeline & Salaries -->
                         <div class="p-6 glass-card rounded-2xl border border-zinc-800 space-y-4" x-data="{ current() { return matrixData.careers[activeTab] || { timeline: {} } } }">
                             <span class="text-[10px] font-mono tracking-widest uppercase text-zinc-500 block">Career Growth & Salary Progression</span>
                             
                             <div class="space-y-4" x-show="current().timeline">
-                                <!-- Year 1 -->
                                 <div class="space-y-1.5">
                                     <div class="flex justify-between text-xs font-semibold">
                                         <span class="text-zinc-300" x-text="'Year 1 (Entry level): ' + (current().timeline.year_1?.title || '')"></span>
@@ -649,7 +683,6 @@
                                     </div>
                                 </div>
 
-                                <!-- Year 5 -->
                                 <div class="space-y-1.5">
                                     <div class="flex justify-between text-xs font-semibold">
                                         <span class="text-zinc-300" x-text="'Year 5 (Mid level): ' + (current().timeline.year_5?.title || '')"></span>
@@ -660,7 +693,6 @@
                                     </div>
                                 </div>
 
-                                <!-- Year 10 -->
                                 <div class="space-y-1.5">
                                     <div class="flex justify-between text-xs font-semibold">
                                         <span class="text-zinc-300" x-text="'Year 10 (Senior / Lead): ' + (current().timeline.year_10?.title || '')"></span>
@@ -673,7 +705,6 @@
                             </div>
                         </div>
 
-                        <!-- Typical Day in the Role -->
                         <div class="p-6 glass-card rounded-2xl border border-zinc-800 space-y-3" x-data="{ current() { return matrixData.careers[activeTab] || {} } }">
                             <span class="text-[10px] font-mono tracking-widest uppercase text-zinc-500 block">A Typical Day in This Role</span>
                             <div class="border border-zinc-800 rounded-xl bg-black/60 p-4 font-mono text-xs text-zinc-400 space-y-3 max-h-56 overflow-y-auto">
@@ -686,7 +717,6 @@
                             </div>
                         </div>
 
-                        <!-- Actionable Next Steps -->
                         <div class="p-6 glass-card rounded-2xl border border-zinc-800 space-y-3" x-data="{ current() { return matrixData.careers[activeTab] || {} } }">
                             <span class="text-[10px] font-mono tracking-widest uppercase text-zinc-500 block">Action Plan to Get Started</span>
                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
